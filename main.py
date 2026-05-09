@@ -4,7 +4,7 @@ import zlib
 import struct
 from otb_parser import NodeReader
 
-# Constantes extraídas das suas sources
+# Constantes extraídas das sources
 OTBM_MAP_DATA = 2
 OTBM_TILE_AREA = 4
 OTBM_TILE = 5
@@ -48,7 +48,7 @@ def load_tibia_dat(filename):
                 if minimap_color > 0:
                     client_colors[client_id] = minimap_color & 0xFF
                     
-                # Pulo de Sprites Otimizado (Resolve MemoryError)
+                # Pulo de Sprites Otimizado (Resolve MemoryError bad allocation)
                 w, h = safe_read(f, 1)[0], safe_read(f, 1)[0]
                 if w > 1 or h > 1: f.seek(1, 1) 
                 l, px, py, pz, ph = struct.unpack('<BBBBB', safe_read(f, 5))
@@ -107,7 +107,7 @@ def load_map_otbm(filename, s2c, dat_colors, otb_colors):
     
     for area in map_node['children']:
         if area['type'] == OTBM_TILE_AREA:
-            # Coordenadas base da área
+
             bx = area['data'][0] | (area['data'][1] << 8)
             by = area['data'][2] | (area['data'][3] << 8)
             bz = area['data'][4]
@@ -115,13 +115,11 @@ def load_map_otbm(filename, s2c, dat_colors, otb_colors):
             for tile in area['children']:
                 if tile['type'] in (OTBM_TILE, OTBM_HOUSETILE):
                     d = tile['data']
-                    # ax, ay são as coordenadas reais (Base + Relativa)
+
                     ax, ay = bx + d[0], by + d[1]
                     f_color = 0
-                    
-                    # --- O SEGREDO ESTÁ AQUI: Loop de Atributos do Tile ---
                     idx = 2
-                    # Se for HouseTile, pula os 4 bytes do HouseID
+
                     if tile['type'] == OTBM_HOUSETILE:
                         idx += 4
                         
@@ -130,19 +128,16 @@ def load_map_otbm(filename, s2c, dat_colors, otb_colors):
                         idx += 1
                         if attr == 0 or attr == 255: break
                         
-                        if attr == 3: # <--- CORREÇÃO AQUI: OTBM_ATTR_TILE_FLAGS é 3!
-                            idx += 4 # Pula 4 bytes de flags
+                        if attr == 3:
+                            idx += 4 
                         elif attr == 9: # OTBM_ATTR_ITEM (O GROUND!)
                             gid = d[idx] | (d[idx+1] << 8)
                             idx += 2
-                            # Ajuste de ID 20.000 conforme seu itemtype.cpp
                             if 20000 < gid < 20100: gid -= 20000
                             cid = s2c.get(gid, 0)
                             f_color = dat_colors.get(cid, 0) or otb_colors.get(gid, 0)
                         else:
-                            # Se for um atributo desconhecido (ActionID, etc), ele aborta.
-                            # Na sua source C++, o Map::loadOtbm só aceita Flags (3) e Item (9).
-                            # Então esse break é seguro para o seu mapa.
+                            # Se for um atributo desconhecido (ActionID, etc), ele break.
                             break
 
                     # --- Itens Filhos (Paredes, bordas, etc) ---
